@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[13]:
+# In[2]:
 
 
 import math
@@ -75,6 +75,52 @@ data = {
     'annual_reward (ETH)': ideal_reward,
     'annual_reward_with_mev (ETH)':ideal_reward_with_mev,
     'annual_yield (%)': annual_yield,
+    'annual_yield_with_mev (%)': annual_yield_with_mev,
+    'delta (%)': delta
+}
+
+df = pd.DataFrame(data)
+
+pd.options.display.float_format = '{:,.2f}'.format
+df.set_index('n_validators')
+
+
+# In[7]:
+
+
+# Only for the luckiest 1%
+n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
+staked = [32 * n for n in n_validators] # ETH actively staked in the network
+u_bpo = [int(binom.ppf(0.99,31556952/12, 1/n)) for n in n_validators] # blocks produced by luckiest 1%
+mean_bpo = [float(binom.mean(31556952/12, 1/n)) for n in n_validators]
+
+full_reward = [(4 * annualised_base_reward(n)) for n in n_validators]
+attestation_reward = [0.75 * f for f in full_reward]
+inclusion_reward = [0.25 * f for f in full_reward]
+
+ideal_reward_with_mev = []
+for i in range(len(n_validators)):
+    r_att = attestation_reward[i]
+    r_inc = inclusion_reward[i]
+    ideal_reward_with_mev.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
+    ideal_reward_with_mev[i] = ideal_reward_with_mev[i] + (u_bpo[i] * avg_mev_reward_per_block)
+
+    ideal_reward_without_mev = []
+for i in range(len(n_validators)):
+    r_att = attestation_reward[i]
+    r_inc = inclusion_reward[i]
+    ideal_reward_without_mev.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
+
+
+annual_yield_without_mev = [100 * r / 32 for r in ideal_reward_without_mev]
+annual_yield_with_mev = [100 * r / 32 for r in ideal_reward_with_mev]
+
+delta = []
+for i in range(len(annual_yield)):
+    delta.append(annual_yield_with_mev[i] - annual_yield_without_mev[i])
+data = {
+    'n_validators': n_validators,
+    'annual_yield_without_mev (%)': annual_yield_without_mev,
     'annual_yield_with_mev (%)': annual_yield_with_mev,
     'delta (%)': delta
 }
