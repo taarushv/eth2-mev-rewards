@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# # Analysis of MEV rewards in ETH2
+# 
+# ### Sample heading
+# Text goes here...
+
+# In[ ]:
 
 
 import math
@@ -29,11 +34,15 @@ def unluckiest_one_percent_blocks_proposed(no_of_validators):
 def luckiest_one_percent_blocks_proposed(no_of_validators):
     return binom.ppf([0.99],31556952/12,1/no_of_validators)
 
-avg_mev_reward_per_block = 0.17 # inferring from flashbots activity
+avg_mev_reward_per_block = 0.18 # inferring from flashbots activity
 lower_bound_for_active_staked_eth = 524288 # required for ETH2 to start
 upper_bound_for_active_staked_eth = 10e6 # 10M
 validators_on_the_network_today = 122435 # april 22
+block_selection_frequency_flashbots = 52 # % of blocks with MEV
 
+
+# ### Sample heading
+# Text goes here...
 
 # In[3]:
 
@@ -56,7 +65,10 @@ pd.options.display.float_format = '{:,.2f}'.format
 df.set_index('n_validators')
 
 
-# In[4]:
+# ### Sample heading
+# Text goes here...
+
+# In[ ]:
 
 
 # tabulate returns for various amounts of validators with and without MEV
@@ -85,6 +97,42 @@ df = pd.DataFrame(data)
 pd.options.display.float_format = '{:,.2f}'.format
 df.set_index('n_validators')
 
+
+# ### Sample heading
+# Text goes here...
+
+# In[16]:
+
+
+# tabulate returns for various amounts of validators with and without MEV
+# setup an array of various # of possible active validators
+n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
+staked = [32 * n for n in n_validators] # ETH actively staked in the network
+ideal_reward = [4 * annualised_base_reward(n) for n in n_validators]
+ideal_reward_with_mev = [(4 * annualised_base_reward(n) +  (avg_mev_reward_per_block * average_blocks_proposed_per_year(n)  * (block_selection_frequency_flashbots/100))) for n in n_validators]
+annual_yield = [100 * r / 32 for r in ideal_reward]
+annual_yield_with_mev = [100 * r / 32 for r in ideal_reward_with_mev]
+delta = []
+for i in range(len(annual_yield)):
+    delta.append(annual_yield_with_mev[i] - annual_yield[i])
+data = {
+    'n_validators': n_validators,
+    'total_staked (ETH)': staked,
+    'annual_reward (ETH)': ideal_reward,
+    'annual_reward_with_mev (ETH)':ideal_reward_with_mev,
+    'annual_yield (%)': annual_yield,
+    'annual_yield_with_mev (%)': annual_yield_with_mev,
+    'delta (%)': delta
+}
+
+df = pd.DataFrame(data)
+
+pd.options.display.float_format = '{:,.2f}'.format
+df.set_index('n_validators')
+
+
+# ### Sample heading
+# Text goes here...
 
 # In[5]:
 
@@ -132,7 +180,10 @@ pd.options.display.float_format = '{:,.2f}'.format
 df.set_index('n_validators')
 
 
-# In[5]:
+# ### Sample heading
+# Text goes here...
+
+# In[10]:
 
 
 #  delta comp for luckiest/unluckiest 1%, in the context of inequality
@@ -191,14 +242,17 @@ ax.set_title('Delta of yield between luckiest and unluckiest 1% of validators')
 leg = ax.legend()
 
 
-# In[7]:
+# ### Sample heading
+# Text goes here...
+
+# In[3]:
 
 
 # Ideal, with and without MEV
 
 n_validators = [n for n in range(lower_bound_for_active_staked_eth//32,int(upper_bound_for_active_staked_eth)//32,1000)] # get no of validators for the range 0.5M to 10M staked ETH, 3200 at a time
 ideal_reward = [(4 * annualised_base_reward(n)) for n in n_validators]
-ideal_reward_with_mev = [(4 * annualised_base_reward(n) +  avg_mev_reward_per_block * average_blocks_proposed_per_year(n)) for n in n_validators]
+ideal_reward_with_mev = [(4 * annualised_base_reward(n) +  (avg_mev_reward_per_block * average_blocks_proposed_per_year(n) * (block_selection_frequency_flashbots/100)) ) for n in n_validators]
 
 fig, ax = plt.subplots(figsize=(12, 8))
 
@@ -210,6 +264,9 @@ ax.set_ylabel('Return per validator per year (%)')
 ax.set_title('Ideal annual validator rewards')
 leg = ax.legend()
 
+
+# ### Sample heading
+# Text goes here...
 
 # In[8]:
 
@@ -231,6 +288,9 @@ ax.set_title('Ideal annual validator rewards')
 ax.set_yscale("log")
 leg = ax.legend()
 
+
+# ### Sample heading
+# Text goes here...
 
 # In[9]:
 
@@ -275,6 +335,9 @@ ax.set_title('Ideal annual validator rewards')
 leg = ax.legend()
 
 
+# ### Sample heading
+# Text goes here...
+
 # In[10]:
 
 
@@ -318,6 +381,9 @@ ax.set_title('Ideal annual validator rewards - Log')
 ax.set_yscale("log")
 leg = ax.legend()
 
+
+# ### Sample heading
+# Text goes here...
 
 # In[11]:
 
@@ -372,6 +438,9 @@ ax.set_title('Ideal annual validator rewards')
 leg = ax.legend();
 
 
+# ### Sample heading
+# Text goes here...
+
 # In[12]:
 
 
@@ -408,7 +477,10 @@ ax.set_title('Ideal annual validator rewards w/ MEV (Perfect Validator on an Imp
 leg = ax.legend()
 
 
-# In[13]:
+# ### Sample heading
+# Text goes here...
+
+# In[5]:
 
 
 # Imperfect Validator on a Perfect Network
@@ -419,7 +491,7 @@ uptime = [i / 100 for i in range(101)]
 fig, ax = plt.subplots(figsize=(12, 8))
 for n in n_validators:
     base_reward = annualised_base_reward(n)
-    mev_reward = average_blocks_proposed_per_year(n) * avg_mev_reward_per_block
+    mev_reward = average_blocks_proposed_per_year(n) * avg_mev_reward_per_block * (block_selection_frequency_flashbots/100)
     net_reward = []
     for u in uptime:
         rewards = 4 * u * base_reward
@@ -437,21 +509,27 @@ leg = ax.legend()
 #Skewed under 0 because we take average # of blocks proposed, need to repeat for luckiest/unluckiest 1%
 
 
-# In[14]:
+# ### Sample heading
+# Text goes here...
+
+# In[39]:
 
 
 ## TODO: Confirm if this is right
 ## Full model - imperfect validator operating in an imperfect validator
-base_reward = annualised_base_reward(100000)
-participation = 0.99
-uptime = 0.99
-net_reward = 3 * base_reward * participation * uptime              - 3 * base_reward * (1 - participation)               + (7/8) * base_reward * participation * uptime * math.log(participation) / (participation - 1)              + (1/8) * base_reward * participation * uptime + (avg_mev_reward_per_block * average_blocks_proposed_per_year(100000) * uptime * participation)
+base_reward = annualised_base_reward(120000)
+participation = 0.2605
+uptime = 1
+net_reward = 3 * base_reward * participation * uptime              - 3 * base_reward * (1 - participation)               + (7/8) * base_reward * participation * uptime * math.log(participation) / (participation - 1)              + (1/8) * base_reward * participation * uptime + ((block_selection_frequency_flashbots/100) * avg_mev_reward_per_block * average_blocks_proposed_per_year(100000) * uptime * participation)
 
 print("Assuming 100000 validators on the network with ", participation*100, "% participaton and", uptime*100, "% network uptimeand" )
 print(f'Net annual reward estimate with MEV= {net_reward:.2f} ETH ({100 * net_reward / 32:.2f}% return on 32 ETH stake)')
 
 
-# In[12]:
+# ### Sample heading
+# Text goes here...
+
+# In[21]:
 
 
 # plot reward for perfect validator in several participation level contexts
@@ -471,7 +549,7 @@ for P in participation_rate:
         inclusion_reward = [(7/8) * r for r in base_reward]
         
     block_reward = [(1/8) * r * P for r in base_reward]
-    mev_reward = [avg_mev_reward_per_block * average_blocks_proposed_per_year(n) for n in n_validators]
+    mev_reward = [avg_mev_reward_per_block * average_blocks_proposed_per_year(n)* (block_selection_frequency_flashbots/100) for n in n_validators]
     total_reward = [accuracy_rewards[i] + inclusion_reward[i] + block_reward[i] + mev_reward[i]
                     for i in range(len(block_reward))]
     r_100000.append(total_reward[50])
@@ -484,8 +562,41 @@ print(f'at P = {participation_rate[4]:.2f}, rewards fall by {100 * (1 - r_100000
 print(f'at P = {participation_rate[5]:.2f}, rewards fall by {100 * (1 - r_100000[5] / r_100000[0]):.2f}%')
 
 
-# In[ ]:
+# ### Sample heading
+# Text goes here...
+
+# In[4]:
 
 
+# plot reward for perfect validator in several participation level contexts
+
+participation_rate = [1,0.99,0.98,0.97,0.96, 0.95]
+
+n_validators = [n for n in range(50000,int(10e6)//32,1000)]
+base_reward = [annualised_base_reward(n) for n in n_validators]
 
 
+r_100000 = []
+for P in participation_rate:
+    accuracy_rewards = [P * 3 * r for r in base_reward]
+    if P < 1:
+        inclusion_reward = [(7/8) * r * P * math.log(P) / (P-1) for r in base_reward]
+    else:
+        inclusion_reward = [(7/8) * r for r in base_reward]
+        
+    block_reward = [(1/8) * r * P for r in base_reward]
+    mev_reward = [avg_mev_reward_per_block * average_blocks_proposed_per_year(n) *(block_selection_frequency_flashbots/100) for n in n_validators]
+    total_reward = [accuracy_rewards[i] + inclusion_reward[i] + block_reward[i] + mev_reward[i]
+                    for i in range(len(block_reward))]
+    r_100000.append(total_reward[50])
+    
+
+print(f'at P = {participation_rate[1]:.2f}, rewards fall by {100 * (1 - r_100000[1] / r_100000[0]):.2f}%')
+print(f'at P = {participation_rate[2]:.2f}, rewards fall by {100 * (1 - r_100000[2] / r_100000[0]):.2f}%')
+print(f'at P = {participation_rate[3]:.2f}, rewards fall by {100 * (1 - r_100000[3] / r_100000[0]):.2f}%')
+print(f'at P = {participation_rate[4]:.2f}, rewards fall by {100 * (1 - r_100000[4] / r_100000[0]):.2f}%')
+print(f'at P = {participation_rate[5]:.2f}, rewards fall by {100 * (1 - r_100000[5] / r_100000[0]):.2f}%')
+
+
+# ### Sample heading
+# Text goes here...
