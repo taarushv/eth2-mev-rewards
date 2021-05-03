@@ -3,10 +3,12 @@
 
 # # Analysis of MEV rewards in ETH2
 # 
-# ### Sample heading
-# Text goes here...
+# ### Hello!
+# It's a useful thought exercise to think through the additional MEV rewards validators would get on top of their staking yield were they to run modified eth1 client software like Flashbots' MEV-Geth. Re-using the code from [this article](https://pintail.xyz/posts/beacon-chain-validator-rewards/) by Pintail, we can add additional considerations for MEV rewards using Flashbots data as a proxy for it.
+# 
+# These considerations have been added at the bottom here and stem from data collected by running an MEV-Geth node and analyzing Flashbots data from the public [mev-blocks API](https://blocks.flashbots.net).
 
-# In[ ]:
+# In[7]:
 
 
 import math
@@ -34,218 +36,19 @@ def unluckiest_one_percent_blocks_proposed(no_of_validators):
 def luckiest_one_percent_blocks_proposed(no_of_validators):
     return binom.ppf([0.99],31556952/12,1/no_of_validators)
 
-avg_mev_reward_per_block = 0.18 # inferring from flashbots activity
+avg_mev_reward_per_block = 0.18 # inferring from flashbots activity, we obtain this number by substracting the Flashbots miner tip from the tail gas price multiplied by the gas used by the mined Flashbots bundle.
 lower_bound_for_active_staked_eth = 524288 # required for ETH2 to start
 upper_bound_for_active_staked_eth = 10e6 # 10M
 validators_on_the_network_today = 122435 # april 22
-block_selection_frequency_flashbots = 52 # % of blocks with MEV
+block_selection_frequency_flashbots = 52 # % of blocks seen by Flashbots-enabled miners contains Flashbots bundles
 
 
-# ### Sample heading
-# Text goes here...
+# ### Ideal case on infinite timescale
+# Let's consider first the case where:
+# * all validators participate perfectly and get the maximum reward they can get (i.e. $4*\text{base reward}$ - there is no slashing)
+# * all rewards are distributed evenly since every validator has an equal chance of being selected to produce a block, so on an infinite timescale rewards should even out.
 
-# In[3]:
-
-
-# Yearly, blocks proposed by unluckiest 1%, median, and luckiest 1% of validators. 
-n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
-staked = [32 * n for n in n_validators] # ETH actively staked in the network
-
-data = {
-    'n_validators': n_validators,
-    'total_staked (ETH)': staked,
-    'no_of_blocks_proposed_by_unluckiest_1%': [(binom.ppf(0.01,31556952/12, 1/n)) for n in n_validators],
-    'no_of_blocks_proposed_by_median':[(binom.ppf(0.5,31556952/12, 1/n)) for n in n_validators],
-    'no_of_blocks_proposed_by_luckiest_1%': [(binom.ppf(0.99,31556952/12, 1/n)) for n in n_validators]
-}
-
-df = pd.DataFrame(data)
-
-pd.options.display.float_format = '{:,.2f}'.format
-df.set_index('n_validators')
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[ ]:
-
-
-# tabulate returns for various amounts of validators with and without MEV
-# setup an array of various # of possible active validators
-n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
-staked = [32 * n for n in n_validators] # ETH actively staked in the network
-ideal_reward = [4 * annualised_base_reward(n) for n in n_validators]
-ideal_reward_with_mev = [(4 * annualised_base_reward(n) +  (avg_mev_reward_per_block * average_blocks_proposed_per_year(n))) for n in n_validators]
-annual_yield = [100 * r / 32 for r in ideal_reward]
-annual_yield_with_mev = [100 * r / 32 for r in ideal_reward_with_mev]
-delta = []
-for i in range(len(annual_yield)):
-    delta.append(annual_yield_with_mev[i] - annual_yield[i])
-data = {
-    'n_validators': n_validators,
-    'total_staked (ETH)': staked,
-    'annual_reward (ETH)': ideal_reward,
-    'annual_reward_with_mev (ETH)':ideal_reward_with_mev,
-    'annual_yield (%)': annual_yield,
-    'annual_yield_with_mev (%)': annual_yield_with_mev,
-    'delta (%)': delta
-}
-
-df = pd.DataFrame(data)
-
-pd.options.display.float_format = '{:,.2f}'.format
-df.set_index('n_validators')
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[16]:
-
-
-# tabulate returns for various amounts of validators with and without MEV
-# setup an array of various # of possible active validators
-n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
-staked = [32 * n for n in n_validators] # ETH actively staked in the network
-ideal_reward = [4 * annualised_base_reward(n) for n in n_validators]
-ideal_reward_with_mev = [(4 * annualised_base_reward(n) +  (avg_mev_reward_per_block * average_blocks_proposed_per_year(n)  * (block_selection_frequency_flashbots/100))) for n in n_validators]
-annual_yield = [100 * r / 32 for r in ideal_reward]
-annual_yield_with_mev = [100 * r / 32 for r in ideal_reward_with_mev]
-delta = []
-for i in range(len(annual_yield)):
-    delta.append(annual_yield_with_mev[i] - annual_yield[i])
-data = {
-    'n_validators': n_validators,
-    'total_staked (ETH)': staked,
-    'annual_reward (ETH)': ideal_reward,
-    'annual_reward_with_mev (ETH)':ideal_reward_with_mev,
-    'annual_yield (%)': annual_yield,
-    'annual_yield_with_mev (%)': annual_yield_with_mev,
-    'delta (%)': delta
-}
-
-df = pd.DataFrame(data)
-
-pd.options.display.float_format = '{:,.2f}'.format
-df.set_index('n_validators')
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[5]:
-
-
-# Only for the luckiest 1%
-n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
-staked = [32 * n for n in n_validators] # ETH actively staked in the network
-u_bpo = [int(binom.ppf(0.99,31556952/12, 1/n)) for n in n_validators] # blocks produced by luckiest 1%
-mean_bpo = [float(binom.mean(31556952/12, 1/n)) for n in n_validators]
-
-full_reward = [(4 * annualised_base_reward(n)) for n in n_validators]
-attestation_reward = [0.75 * f for f in full_reward]
-inclusion_reward = [0.25 * f for f in full_reward]
-
-ideal_reward_with_mev = []
-for i in range(len(n_validators)):
-    r_att = attestation_reward[i]
-    r_inc = inclusion_reward[i]
-    ideal_reward_with_mev.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
-    ideal_reward_with_mev[i] = ideal_reward_with_mev[i] + (u_bpo[i] * avg_mev_reward_per_block)
-
-    ideal_reward_without_mev = []
-for i in range(len(n_validators)):
-    r_att = attestation_reward[i]
-    r_inc = inclusion_reward[i]
-    ideal_reward_without_mev.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
-
-
-annual_yield_without_mev = [100 * r / 32 for r in ideal_reward_without_mev]
-annual_yield_with_mev = [100 * r / 32 for r in ideal_reward_with_mev]
-
-delta = []
-for i in range(len(annual_yield)):
-    delta.append(annual_yield_with_mev[i] - annual_yield_without_mev[i])
-data = {
-    'n_validators': n_validators,
-    'annual_yield_without_mev_luckiest_1% (%)': annual_yield_without_mev,
-    'annual_yield_with_mev_luckiest_1% (%)': annual_yield_with_mev,
-    'delta (%)': delta
-}
-
-df = pd.DataFrame(data)
-
-pd.options.display.float_format = '{:,.2f}'.format
-df.set_index('n_validators')
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[10]:
-
-
-#  delta comp for luckiest/unluckiest 1%, in the context of inequality
-
-n_validators = [n for n in range(lower_bound_for_active_staked_eth//32,int(upper_bound_for_active_staked_eth)//32,20000)] # get no of validators for the range 0.5M to 10M staked ETH, 3200 at a time
-staked = [32 * n for n in n_validators] # ETH actively staked in the network
-u_bpo = [int(binom.ppf(0.99,31556952/12, 1/n)) for n in n_validators] # blocks produced by luckiest 1%
-mean_bpo = [int(binom.ppf(0.5,31556952/12, 1/n)) for n in n_validators]
-l_bpo = [int(binom.ppf(0.01,31556952/12, 1/n)) for n in n_validators] # blocks produced by unluckiest 1%
-
-full_reward = [(4 * annualised_base_reward(n)) for n in n_validators]
-attestation_reward = [0.75 * f for f in full_reward]
-inclusion_reward = [0.25 * f for f in full_reward]
-
-ideal_reward_with_mev_luckiest = []
-ideal_reward_with_mev_unluckiest = []
-
-for i in range(len(n_validators)):
-    r_att = attestation_reward[i]
-    r_inc = inclusion_reward[i]
-    ideal_reward_with_mev_luckiest.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
-    ideal_reward_with_mev_luckiest[i] = ideal_reward_with_mev_luckiest[i] + (u_bpo[i] * avg_mev_reward_per_block)
-    ideal_reward_with_mev_unluckiest.append(r_att + r_inc * ((7/8) + (1/8) * l_bpo[i] / mean_bpo[i]))
-    ideal_reward_with_mev_unluckiest[i] = ideal_reward_with_mev_unluckiest[i] + (l_bpo[i] * avg_mev_reward_per_block)
-
-ideal_reward_without_mev_luckiest = []
-ideal_reward_without_mev_unluckiest = []
-
-for i in range(len(n_validators)):
-    r_att = attestation_reward[i]
-    r_inc = inclusion_reward[i]
-    ideal_reward_without_mev_luckiest.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
-    ideal_reward_without_mev_unluckiest.append(r_att + r_inc * ((7/8) + (1/8) * l_bpo[i] / mean_bpo[i]))
-
-annual_yield_without_mev_luckiest = [100 * r / 32 for r in ideal_reward_without_mev_luckiest]
-annual_yield_without_mev_unluckiest = [100 * r / 32 for r in ideal_reward_without_mev_unluckiest]
-annual_yield_with_mev_luckiest = [100 * r / 32 for r in ideal_reward_with_mev_luckiest]
-annual_yield_with_mev_unluckiest = [100 * r / 32 for r in ideal_reward_with_mev_unluckiest]
-
-delta_with_mev = []
-delta_without_mev = []
-for i in range(len(n_validators)):
-    delta_with_mev.append(annual_yield_with_mev_luckiest[i] - annual_yield_with_mev_unluckiest[i])
-    delta_without_mev.append(annual_yield_without_mev_luckiest[i] - annual_yield_without_mev_unluckiest[i])
-
-
-fig, ax = plt.subplots(figsize=(12, 8))
-ax.plot([n for n in n_validators], [d for d in delta_with_mev], label='With MEV')
-ax.plot([n for n in n_validators], [d for d in delta_without_mev], label='Without MEV')
-
-plt.axvline(x=validators_on_the_network_today, linestyle="dotted", label="Approximate amount of validators as of writing (~120k)")
-ax.set_xlabel('No of validators on the network')
-ax.set_ylabel('Delta % ')
-ax.set_title('Delta of yield between luckiest and unluckiest 1% of validators')
-#ax.set_yscale("log")
-leg = ax.legend()
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[3]:
+# In[8]:
 
 
 # Ideal, with and without MEV
@@ -265,127 +68,82 @@ ax.set_title('Ideal annual validator rewards')
 leg = ax.legend()
 
 
-# ### Sample heading
-# Text goes here...
-
-# In[8]:
+# In[29]:
 
 
-# Ideal, with and without MEV
+# tabulate returns for various amounts of validators with and without MEV
+# setup an array of various # of possible active validators
+n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
+staked = [32 * n for n in n_validators] # ETH actively staked in the network
+ideal_reward = [4 * annualised_base_reward(n) for n in n_validators]
+ideal_reward_with_mev = [(4 * annualised_base_reward(n) +  (avg_mev_reward_per_block * average_blocks_proposed_per_year(n)  * (block_selection_frequency_flashbots/100))) for n in n_validators]
+annual_yield = [100 * r / 32 for r in ideal_reward]
+annual_yield_with_mev = [100 * r / 32 for r in ideal_reward_with_mev]
+percentage_increase = []
+for i in range(len(annual_yield)):
+    percentage_increase.append((annual_yield_with_mev[i]/annual_yield[i]-1)*100)
+data = {
+    'n_validators': n_validators,
+    'annual_reward (ETH)': ideal_reward,
+    'annual_reward_with_mev (ETH)':ideal_reward_with_mev,
+    'annual_yield (%)': annual_yield,
+    'annual_yield_with_mev (%)': annual_yield_with_mev,
+    'delta (%)': percentage_increase,
+}
 
-n_validators = [n for n in range(lower_bound_for_active_staked_eth//32,int(upper_bound_for_active_staked_eth)//32,1000)] # get no of validators for the range 0.5M to 10M staked ETH, 3200 at a time
-ideal_reward = [(4 * annualised_base_reward(n)) for n in n_validators]
-ideal_reward_with_mev = [(4 * annualised_base_reward(n) +  avg_mev_reward_per_block * average_blocks_proposed_per_year(n)) for n in n_validators]
+df = pd.DataFrame(data)
 
-fig, ax = plt.subplots(figsize=(12, 8))
-
-ax.plot([n for n in n_validators], [100 * r / 32 for r in ideal_reward], label='Ideal annual rewards without MEV')
-ax.plot([n for n in n_validators], [100 * r / 32 for r in ideal_reward_with_mev], label='Ideal annual rewards with MEV')
-plt.axvline(x=validators_on_the_network_today, linestyle="dotted", label="Approximate amount of validators as of writing (~120k)")
-ax.set_xlabel('No of validators on the network')
-ax.set_ylabel('Return per validator per year (%)')
-ax.set_title('Ideal annual validator rewards')
-ax.set_yscale("log")
-leg = ax.legend()
+pd.options.display.float_format = '{:,.2f}'.format
+df.set_index('n_validators')
 
 
-# ### Sample heading
-# Text goes here...
+# At the current level of validators, we find that MEV can increase validator rewards by XX%, or give an implied yield of ZZ% rather than non-MEV yield of YY%. 
+# Going from estimates, by the end of the year if expect about 6m staked then validator could see their revenue increase by L%, giving an implied yield of W% rather than a non-MEV yield of Q%.
+
+# ### ideal case on 1y timescale
+# Over any finite timescale, there will be variability in rewards, since some validators will be lucky and be given the opportunity to propose a greater than average number of blocks, and some unlucky, proposing fewer. 
+# 
+# We can find the distribution of luck for block proposal frequency in a year using the binomial distribution formula:
+# - every validator has an equal chance of being selected to propose each slot
+#     - if there are 100,000 validators then the chance of being selected to propose a slot is $10^{-5}$
+# - there are $\ 31556952 / 12 = 2629746$ slots per year. 
+# 
+# 
+# For 100,000 validators, this give us $$P(X) = {{2629746}\choose{k}} \cdot (10^{-5})^k{(1-10^{-5})}^{2629746-k}$$
+
+# 
+# // TODO: add binomial distribution graph for 100k validators
+
+# With 100,000 validators, the mean number of blocks proposed per validator per year is 26.30
+# - The unluckiest 1% of validators ($p(X) \leq 0.99)$ will have the opportunity to produce at most 15 blocks in a year.
+# - The median (average) validator ($p(X) = 0.5$) will have the opportunity to produce 26 blocks in a year
+# - The luckiest 1% of validators ($p(X) \geq 0.01$) will have the opportunity to produce at least 39 blocks in a year.
+# 
+# Repeating the same calculation for different numbers of validators, we obtain the table below:
 
 # In[9]:
 
 
-# plot ideal ETH staking return with interpercentile range
+# tabulate blocks proposed by unluckiest 1%, median, and luckiest 1% of validators over a year
+n_validators = [524288 // 32, 50000, 100000, 120000, 150000, 200000, 250000, 300000, 10000000 // 32]
+staked = [32 * n for n in n_validators] # ETH actively staked in the network
 
-n_validators = [n for n in range(lower_bound_for_active_staked_eth//32,int(upper_bound_for_active_staked_eth)//32,1000)] # get no of validators for the range 0.5M to 10M staked ETH, 3200 at a time
-full_reward = [(4 * annualised_base_reward(n)) for n in n_validators]
-attestation_reward = [0.75 * f for f in full_reward]
-inclusion_reward = [0.25 * f for f in full_reward]
-p = [1/n for n in n_validators]
+data = {
+    'number of validators': n_validators,
+    'unluckiest 1%': [(binom.ppf(0.01,31556952/12, 1/n)) for n in n_validators],
+    'median':[(binom.ppf(0.5,31556952/12, 1/n)) for n in n_validators],
+    'luckiest 1%': [(binom.ppf(0.99,31556952/12, 1/n)) for n in n_validators]
+}
 
-# calculate lower and upper quartiles for block proposal opportunities
-l_bpo = [int(binom.ppf(0.01,31556952/12, 1/n)) for n in n_validators]
-mean_bpo = [float(binom.mean(31556952/12, 1/n)) for n in n_validators]
-u_bpo = [int(binom.ppf(0.99,31556952/12, 1/n)) for n in n_validators]
+df = pd.DataFrame(data)
 
-
-full_reward_with_mev = [(4 * annualised_base_reward(n)+ (avg_mev_reward_per_block * average_blocks_proposed_per_year(n))) for n in n_validators] 
-
-# calculate lower and upper quartiles for ideal reward, based on block proposal opportunties
-l_reward, u_reward = [], []
-for i in range(len(full_reward)):
-    r_att = attestation_reward[i]
-    r_inc = inclusion_reward[i]
-    l_reward.append(r_att + r_inc * ((7/8) + (1/8) * l_bpo[i] / mean_bpo[i]))
-    l_reward[i] = l_reward[i] + (l_bpo[i] * avg_mev_reward_per_block)
-    u_reward.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
-    u_reward[i] = u_reward[i] + (u_bpo[i] * avg_mev_reward_per_block)
+pd.options.display.float_format = '{:,.2f}'.format
+df.set_index('number of validators')
 
 
-fig, ax = plt.subplots(figsize=(12, 8))
-
-ax.plot([n for n in n_validators], [100 * r / 32 for r in u_reward] , label='Luckiest 1% of validators with MEV extraction')
-ax.plot([n for n in n_validators], [100 * r / 32 for r in l_reward], label='Unluckiest 1% of validators with MEV extraction')
-ax.plot([n for n in n_validators], [100 * r / 32 for r in full_reward], label='Vanilla validator without MEV extraction')
-ax.plot([n for n in n_validators], [100 * r / 32 for r in full_reward_with_mev], label='Average validator with MEV extraction')
-ax.set_xlabel('No of validators on the network')
-ax.set_ylabel('Return per validator per year (%)')
-plt.axvline(x=validators_on_the_network_today, linestyle="dotted", label="Approximate amount of validators as of writing (~120k)")
-ax.set_title('Ideal annual validator rewards')
-leg = ax.legend()
-
-
-# ### Sample heading
-# Text goes here...
+# Using these numbers, we can plot maximum validator rewards over a finite timescale and notice how a difference in luck influences what the luckiest 1% validators will make in a year, vs the unluckiest 1%.
 
 # In[10]:
-
-
-# plot ideal ETH staking return with interpercentile range - Log
-
-n_validators = [n for n in range(lower_bound_for_active_staked_eth//32,int(upper_bound_for_active_staked_eth)//32,1000)] # get no of validators for the range 0.5M to 10M staked ETH, 3200 at a time
-full_reward = [(4 * annualised_base_reward(n)) for n in n_validators]
-attestation_reward = [0.75 * f for f in full_reward]
-inclusion_reward = [0.25 * f for f in full_reward]
-p = [1/n for n in n_validators]
-
-# calculate lower and upper quartiles for block proposal opportunities
-l_bpo = [int(binom.ppf(0.01,31556952/12, 1/n)) for n in n_validators]
-mean_bpo = [float(binom.mean(31556952/12, 1/n)) for n in n_validators]
-u_bpo = [int(binom.ppf(0.99,31556952/12, 1/n)) for n in n_validators]
-
-
-full_reward_with_mev = [(4 * annualised_base_reward(n)+ (avg_mev_reward_per_block * average_blocks_proposed_per_year(n))) for n in n_validators] 
-
-# calculate lower and upper quartiles for ideal reward, based on block proposal opportunties
-l_reward, u_reward = [], []
-for i in range(len(full_reward)):
-    r_att = attestation_reward[i]
-    r_inc = inclusion_reward[i]
-    l_reward.append(r_att + r_inc * ((7/8) + (1/8) * l_bpo[i] / mean_bpo[i]))
-    l_reward[i] = l_reward[i] + (l_bpo[i] * avg_mev_reward_per_block)
-    u_reward.append(r_att + r_inc * ((7/8) + (1/8) * u_bpo[i] / mean_bpo[i]))
-    u_reward[i] = u_reward[i] + (u_bpo[i] * avg_mev_reward_per_block)
-
-
-fig, ax = plt.subplots(figsize=(12, 8))
-
-ax.plot([n for n in n_validators], [100 * r / 32 for r in u_reward] , label='Luckiest 1% of validators with MEV extraction')
-ax.plot([n for n in n_validators], [100 * r / 32 for r in l_reward], label='Unluckiest 1% of validators with MEV extraction')
-ax.plot([n for n in n_validators], [100 * r / 32 for r in full_reward], label='Vanilla validator without MEV extraction')
-ax.plot([n for n in n_validators], [100 * r / 32 for r in full_reward_with_mev], label='Average validator with MEV extraction')
-ax.set_xlabel('No of validators on the network')
-ax.set_ylabel('Return per validator per year (%)')
-plt.axvline(x=validators_on_the_network_today, linestyle="dotted", label="Approximate amount of validators as of writing (~120k)")
-ax.set_title('Ideal annual validator rewards - Log')
-ax.set_yscale("log")
-leg = ax.legend()
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[11]:
 
 
 # plot ideal ETH staking return with interpercentile range
@@ -438,98 +196,27 @@ ax.set_title('Ideal annual validator rewards')
 leg = ax.legend();
 
 
-# ### Sample heading
-# Text goes here...
+# ### Perfect validator on an imperfect network 
+# 
+# Now that we've modelled the above, we can look into versions of the model that factor in slashing constraints. The first situation to model is a perfect validator on an imperfect network.
+# 
+# Validators get slashed not only for their own behavior but for the behaviour of others. Even if a validator behaves perfectly, other's behaviour may influence their reward. In particular, Pintail outlines two reasons perfect validators can get slashed:
+# - the accuracy reward is scaled by the proportion of active validators who voted the same way
+# - if an attestion of the perfect validator is included late because the block producer for the slot is offline, then the inclusion reward declines in inverse proportion to the inclusion delay.
+# 
+# These two cases have been modelled by Pintail in [the article](https://pintail.xyz/posts/beacon-chain-validator-rewards/), we use his model here.
+# 
+# **without MEV**
+# 
+# at P = 0.99, rewards fall by 0.89%
+# 
+# at P = 0.98, rewards fall by 1.78%
+# 
+# at P = 0.97, rewards fall by 2.68%
+# 
+# at P = 0.96, rewards fall by 3.57%
 
-# In[12]:
-
-
-# Perfect validator on an Imperfect Network
-
-# plot reward for perfect validator in several participation level contexts
-participation_rate = [1,0.99,0.95,0.92,0.90]
-
-n_validators = [n for n in range(lower_bound_for_active_staked_eth//32,int(upper_bound_for_active_staked_eth)//32,1000)]
-base_reward = [annualised_base_reward(n) for n in n_validators]
-
-fig, ax = plt.subplots(figsize=(12, 8))
-
-r_100000 = []
-for P in participation_rate:
-    accuracy_rewards = [P * 3 * r for r in base_reward]
-    if P < 1:
-        inclusion_reward = [(7/8) * r * P * math.log(P) / (P-1) for r in base_reward]
-    else:
-        inclusion_reward = [(7/8) * r for r in base_reward]
-        
-    block_reward = [(1/8) * r * P for r in base_reward]
-    total_reward = [accuracy_rewards[i] + inclusion_reward[i] + block_reward[i]
-                    for i in range(len(block_reward))]
-    total_reward = [total_reward[i] + (avg_mev_reward_per_block * average_blocks_proposed_per_year(n)) for i, n in enumerate(n_validators)]
-    ax.plot([n for n in n_validators], [100 * r / 32 for r in total_reward], label=f'Validator participation P = {P:.2f}')
-    r_100000.append(total_reward[50])
-    
-ax.set_xlabel('No of validators on the network')
-ax.set_ylabel('Return per validator per year (%)')
-plt.axvline(x=validators_on_the_network_today, linestyle="dotted", label="Approximate amount of validators as of writing (~120k)")
-ax.set_title('Ideal annual validator rewards w/ MEV (Perfect Validator on an Imperfect Network)')
-#ax.set_yscale("log")
-leg = ax.legend()
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[5]:
-
-
-# Imperfect Validator on a Perfect Network
-
-n_validators = [100000, 150000, 200000, 250000, 300000]
-uptime = [i / 100 for i in range(101)]
-
-fig, ax = plt.subplots(figsize=(12, 8))
-for n in n_validators:
-    base_reward = annualised_base_reward(n)
-    mev_reward = average_blocks_proposed_per_year(n) * avg_mev_reward_per_block * (block_selection_frequency_flashbots/100)
-    net_reward = []
-    for u in uptime:
-        rewards = 4 * u * base_reward
-        penalties = 3 * (1 - u) * base_reward
-        mev_reward_adjusted_for_uptime = u * mev_reward
-        net_reward.append(rewards - penalties + mev_reward_adjusted_for_uptime)
-
-    ax.plot(range(101), net_reward, label=f'n_validators = {n}')
-
-ax.set_xlabel('Percentage uptime')
-ax.set_ylabel('Annual net reward (ETH)')
-ax.set_title('Expected annual net rewards against validator downtime\n'
-             '(for an imperfect MEV validator in a perfect validator set)')
-leg = ax.legend()
-#Skewed under 0 because we take average # of blocks proposed, need to repeat for luckiest/unluckiest 1%
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[39]:
-
-
-## TODO: Confirm if this is right
-## Full model - imperfect validator operating in an imperfect validator
-base_reward = annualised_base_reward(120000)
-participation = 0.2605
-uptime = 1
-net_reward = 3 * base_reward * participation * uptime              - 3 * base_reward * (1 - participation)               + (7/8) * base_reward * participation * uptime * math.log(participation) / (participation - 1)              + (1/8) * base_reward * participation * uptime + ((block_selection_frequency_flashbots/100) * avg_mev_reward_per_block * average_blocks_proposed_per_year(100000) * uptime * participation)
-
-print("Assuming 100000 validators on the network with ", participation*100, "% participaton and", uptime*100, "% network uptimeand" )
-print(f'Net annual reward estimate with MEV= {net_reward:.2f} ETH ({100 * net_reward / 32:.2f}% return on 32 ETH stake)')
-
-
-# ### Sample heading
-# Text goes here...
-
-# In[21]:
+# In[11]:
 
 
 # plot reward for perfect validator in several participation level contexts
@@ -559,44 +246,55 @@ print(f'at P = {participation_rate[1]:.2f}, rewards fall by {100 * (1 - r_100000
 print(f'at P = {participation_rate[2]:.2f}, rewards fall by {100 * (1 - r_100000[2] / r_100000[0]):.2f}%')
 print(f'at P = {participation_rate[3]:.2f}, rewards fall by {100 * (1 - r_100000[3] / r_100000[0]):.2f}%')
 print(f'at P = {participation_rate[4]:.2f}, rewards fall by {100 * (1 - r_100000[4] / r_100000[0]):.2f}%')
-print(f'at P = {participation_rate[5]:.2f}, rewards fall by {100 * (1 - r_100000[5] / r_100000[0]):.2f}%')
 
 
-# ### Sample heading
-# Text goes here...
+# ### imperfect validator on a perfect network
+# 
+# Now looking at an imperfect validator on a perfect network (ie. where our validator is the only one who goes offline), we can model how being offline affects a validator's revenue. Being offline causes 1) missing out some rewards, 2) penalties for missed attestations. Again, using Pintail's model we can find the minimum online time required in a year to receive a positive net reward.
 
-# In[4]:
-
-
-# plot reward for perfect validator in several participation level contexts
-
-participation_rate = [1,0.99,0.98,0.97,0.96, 0.95]
-
-n_validators = [n for n in range(50000,int(10e6)//32,1000)]
-base_reward = [annualised_base_reward(n) for n in n_validators]
+# In[12]:
 
 
-r_100000 = []
-for P in participation_rate:
-    accuracy_rewards = [P * 3 * r for r in base_reward]
-    if P < 1:
-        inclusion_reward = [(7/8) * r * P * math.log(P) / (P-1) for r in base_reward]
-    else:
-        inclusion_reward = [(7/8) * r for r in base_reward]
-        
-    block_reward = [(1/8) * r * P for r in base_reward]
-    mev_reward = [avg_mev_reward_per_block * average_blocks_proposed_per_year(n) *(block_selection_frequency_flashbots/100) for n in n_validators]
-    total_reward = [accuracy_rewards[i] + inclusion_reward[i] + block_reward[i] + mev_reward[i]
-                    for i in range(len(block_reward))]
-    r_100000.append(total_reward[50])
-    
+# Imperfect Validator on a Perfect Network
 
-print(f'at P = {participation_rate[1]:.2f}, rewards fall by {100 * (1 - r_100000[1] / r_100000[0]):.2f}%')
-print(f'at P = {participation_rate[2]:.2f}, rewards fall by {100 * (1 - r_100000[2] / r_100000[0]):.2f}%')
-print(f'at P = {participation_rate[3]:.2f}, rewards fall by {100 * (1 - r_100000[3] / r_100000[0]):.2f}%')
-print(f'at P = {participation_rate[4]:.2f}, rewards fall by {100 * (1 - r_100000[4] / r_100000[0]):.2f}%')
-print(f'at P = {participation_rate[5]:.2f}, rewards fall by {100 * (1 - r_100000[5] / r_100000[0]):.2f}%')
+n_validators = [100000, 150000, 200000, 250000, 300000]
+uptime = [i / 100 for i in range(101)]
+
+fig, ax = plt.subplots(figsize=(12, 8))
+for n in n_validators:
+    base_reward = annualised_base_reward(n)
+    mev_reward = average_blocks_proposed_per_year(n) * avg_mev_reward_per_block * (block_selection_frequency_flashbots/100)
+    net_reward = []
+    for u in uptime:
+        rewards = 4 * u * base_reward
+        penalties = 3 * (1 - u) * base_reward
+        mev_reward_adjusted_for_uptime = u * mev_reward
+        net_reward.append(rewards - penalties + mev_reward_adjusted_for_uptime)
+
+    ax.plot(range(101), net_reward, label=f'n_validators = {n}')
+
+ax.set_xlabel('Percentage uptime')
+ax.set_ylabel('Annual net reward (ETH)')
+ax.set_title('Expected annual net rewards against validator downtime\n'
+             '(for an imperfect MEV validator in a perfect validator set)')
+leg = ax.legend()
+#Skewed under 0 because we take average # of blocks proposed, need to repeat for luckiest/unluckiest 1%
 
 
-# ### Sample heading
-# Text goes here...
+# The figure we find XX% is lower than the figure looking at validator rewards only, which is 43%.
+
+# ### summary of findings
+# 
+# At the current number of ETH staked on the beacon chain ~4m:
+# 1. validators stand to make an additional X eth per year from MEV revenue, or a XX% increase in average expected rewards, equivalent to an MEV-enabled XX% average annual staying yield vs ZZ% without MEV.
+# 2. MEV rewards increase the inequality between luckiest and unluckiest validators.
+# 3. MEV rewards imply a level of participation X% lower for the same returns as non-MEV rewards.
+# 4. MEV rewards imply a minimum participation rate of ZZ% in order to breakeven, lower than the 43% found by Pintail.
+# 
+# Point #1 is a significant difference from the increase in miner revenue in the current system from mining Flashbots blocks rather than vanilla blocks, which is around 5%[^4]. On the bright side, this means MEV makes becoming a validator more attractive, which in turns means a larger set of validators and higher security for Ethereum. 
+
+# #### future model improvements
+# - better EIP-1559 numbers
+# - factoring in fee burn as being generally accretive to all ETH holders (including validators)
+# - even if all validators benefit from MEV extraction, does the uneveness of distribution of MEV within blocks disproportionaly favours large validators and still leads to oligopolic dynamics? 
+#     
